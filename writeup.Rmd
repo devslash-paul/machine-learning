@@ -1,0 +1,83 @@
+---
+title: "Writeup"
+author: "Paul Thompson"
+date: "10 December 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Building the model for machine learning
+
+To get started, lets take our training data and see what we can learn from what's there.
+```{r} 
+training <- read.csv('pml-training.csv', na.strings=c("#DIV/0!", "NA", ""))
+dim(training)
+# Remove the columns that have no actual data in them
+training<-training[,colSums(is.na(training)) == 0]
+# Remove parts of the data that have no basis in the actual exercise (timestamp, user, etc)
+training <- training[,-c(1:7)]
+str(training)
+```
+
+From all that data, we're trying to classify the `classe` that comes from it. There are 5 levels, A, through E. Lets take a look at the distribution
+
+```{r}
+summary(training$classe)
+```
+
+from that we can confirm we should have enough data to distinguish them all.
+
+
+Lets try a decision tree as a first approach. 
+
+```{r}
+set.seed(3042)
+suppressWarnings(suppressMessages(library(caret)))
+suppressWarnings(suppressMessages(library(dplyr)))
+suppressWarnings(suppressMessages(library(rpart)))
+suppressWarnings(suppressMessages(library(rattle)))
+suppressWarnings(suppressMessages(library(randomForest)))
+sets <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+trainingSet <- training[sets,]
+validation <- training[-sets,]
+modFit <- rpart(classe ~ ., data=trainingSet, method="class")
+fancyRpartPlot(modFit)
+predictionRpart <- predict(modFit, validation, type="class")
+```
+That's a very complicated tree, and we can't really visually tell what's going on, so lets take a look at the results of a prediction with it.
+```{r}
+confusionMatrix(predictionRpart, validation$classe)
+```
+
+As you can see, the accuracy is only at around 75% for the rpart'ed data. We can try an alernate strategy. Given that we got 75% for a single tree, a random forest algorithm is probably a good bet. With multiple trees we may be able to subsample in such a way that would capture the variability and account for it.
+
+```{r}
+modelRandomForest <- randomForest(classe ~ ., data=trainingSet, method="class")
+
+predictRandomForest <- predict(modelRandomForest, validation, type="class")
+predictRandomForest
+```
+This makes sense that it's better. As random forest will combine many classification trees. In this example we're using 500 decision trees rather than the 1 that got us to a 75% rating. 
+
+### Out of sample error rate
+The out of sample error rate for this prediction is 
+```{r}
+sum(predict(modelRandomForest, validation) != validation$classe) / nrow(validation) * 100
+```
+
+So out Out of Sample error is 0.49%
+
+### Prediction for the testing set
+Lets use this prediction model on the test data
+```{r}
+testData <- read.csv('pml-testing.csv')
+dim(testData)
+```
+
+So, lets grab an answer for each of these rows
+```{r}
+predict(modelRandomForest, testData, type="class")
+```
