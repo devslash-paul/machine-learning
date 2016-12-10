@@ -58,7 +58,7 @@ As you can see, the accuracy is only at around 75% for the rpart'ed data. We can
 modelRandomForest <- randomForest(classe ~ ., data=trainingSet, method="class")
 
 predictRandomForest <- predict(modelRandomForest, validation, type="class")
-predictRandomForest
+confusionMatrix(predictRandomForest, validation$classe)
 ```
 This makes sense that it's better. As random forest will combine many classification trees. In this example we're using 500 decision trees rather than the 1 that got us to a 75% rating. 
 
